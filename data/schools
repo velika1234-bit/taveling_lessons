@@ -1,0 +1,24 @@
+[
+  {
+    "id": "karlovo-01",
+    "name": "ОУ „Васил Левски“",
+    "city": "Карлово",
+    "lat": 42.6373,
+    "lng": 24.8043,
+    "order": 1,
+    "description": "Пътуващ урок с дискусия и презентация за делото на Апостола.",
+    "photo": "assets/photos/sample-1.jpg",
+    "link": ""
+  },
+  {
+    "id": "sofia-01",
+    "name": "СУ „Св. Климент Охридски“",
+    "city": "София",
+    "lat": 42.6977,
+    "lng": 23.3219,
+    "order": 2,
+    "description": "Учениците подготвиха изложба и кратка възстановка.",
+    "photo": "assets/photos/sample-2.jpg",
+    "link": "assets/files/sample-materials.pdf"
+  }
+]
