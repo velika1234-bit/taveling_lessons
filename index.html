@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1876: Пътят към Свободата</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Playfair+Display:ital,wght@0,700;1,400&family=Philosopher:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root { --amber-glow: rgba(217, 119, 6, 0.4); }
+        body { font-family: 'Philosopher', sans-serif; background-color: #020617; color: #e2e8f0; margin: 0; overflow: hidden; }
+        .serif { font-family: 'Playfair Display', serif; }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .paper-texture {
+            background-color: #fcf5e5;
+            background-image: url('https://www.transparenttextures.com/patterns/pinstriped-suit.png');
+            color: #1a1a1a;
+        }
+
+        .map-bg {
+            background-image: linear-gradient(rgba(2, 6, 23, 0.8), rgba(2, 6, 23, 0.9)), 
+                              url('https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?q=80&w=2066&auto=format&fit=crop'); 
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            position: relative;
+        }
+
+        .role-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 1px solid rgba(217, 119, 6, 0.1); }
+        .role-card:hover { transform: translateY(-10px); border-color: #d97706; box-shadow: 0 20px 40px -10px var(--amber-glow); }
+
+        .choice-btn { transition: all 0.2s; border-left: 4px solid transparent; }
+        .choice-btn:hover { border-left-color: #d97706; background: rgba(217, 119, 6, 0.05); transform: translateX(5px); }
+
+        .case-image { width: 100%; height: 280px; object-fit: cover; border-radius: 12px; border: 2px solid #2d1a10; }
+        .stat-progress { height: 6px; border-radius: 3px; background: #1e293b; overflow: hidden; }
+        .stat-fill { height: 100%; background: linear-gradient(90deg, #b45309, #f59e0b); transition: width 0.8s ease; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-0 md:p-4">
+
+    <div id="game-container" class="w-full max-w-6xl bg-slate-900 shadow-2xl overflow-hidden md:rounded-3xl flex flex-col h-screen md:h-[95vh] relative border border-slate-800">
+        
+        <header id="game-header" class="hidden bg-black/95 p-4 border-b border-amber-900/30 flex flex-col md:flex-row justify-between items-center z-20 gap-4 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-amber-600 rounded-lg flex items-center justify-center text-2xl">🦁</div>
+                <div>
+                    <h1 class="text-xs md:text-sm font-bold text-amber-500 serif uppercase tracking-widest">1876: Пътят към Свободата</h1>
+                    <p class="text-[9px] text-slate-400 uppercase"><span id="player-role-name"></span>: <span id="player-display-name" class="text-white"></span></p>
+                </div>
+            </div>
+            <div id="stats-panel" class="flex gap-2 md:gap-4"></div>
+        </header>
+
+        <main id="game-view" class="flex-grow overflow-y-auto paper-texture relative no-scrollbar">
+            <section id="screen-start" class="h-full flex items-center justify-center map-bg p-6 text-center">
+                <div class="max-w-md w-full bg-slate-950/90 p-8 rounded-[2rem] border border-amber-600/20 backdrop-blur-md fade-in">
+                    <h2 class="text-3xl md:text-4xl font-bold serif mb-4 text-amber-500 uppercase">Априлското Въстание</h2>
+                    <p class="text-slate-300 mb-8 italic text-sm">Интерактивна историческа реконструкция</p>
+                    <input type="text" id="input-name" placeholder="Вашето име..." class="w-full bg-slate-900 border-2 border-slate-700 p-4 rounded-xl text-white text-center mb-4 focus:border-amber-500 outline-none">
+                    <button onclick="actions.toRoleSelection()" class="w-full bg-amber-600 text-white font-bold py-4 rounded-xl uppercase tracking-widest hover:bg-amber-500 transition-colors">Започни мисията</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <canvas id="cert-canvas" width="800" height="600" class="hidden"></canvas>
+
+    <script>
+        const DATABASE = {
+            roles: {
+                REBEL: {
+                    id: 'REBEL', name: 'Въстаникъ', icon: '⚔️', stats: { military: 40, morale: 60, secret: 50 },
+                    labels: { military: '🛡️ Оръжие', morale: '🔥 Морал', secret: '👁️ Тайна' },
+                    desc: 'Лидер на комитет. Пътят на барута и саможертвата.',
+                    story: [
+                        { title: "Клетвата в Оборище", text: "14 април 1876. Делегатите се събират в местността Оборище. Трябва да вземете съдбоносно решение за началото.", img: "https://plovdivnow.bg/news/2021/04/13/14-april-1876-zapochva-oborishtenskoto-972.jpg", options: [{ text: "Клетва върху камата и Библията.", impact: { morale: 20 }, msg: "Вярата е по-силна от страха!" }, { text: "Поставяне на засилена охрана.", impact: { secret: 15 }, msg: "Осигурявате спокойствие на събранието." }] },
+                        { title: "Кървавото писмо", text: "20 април. Каблешков обявява въстанието в Копривщица. Писмото трябва да стигне до Панагюрище.", img: "https://rns.bg/wp-content/uploads/2023/04/%D0%B0%D0%BF%D1%80%D0%B8%D0%BB%D1%81%D0%BA%D0%BE-%D0%B2%D1%8A%D1%81%D1%82%D0%B0%D0%BD%D0%B8%D0%B5.jpg", options: [{ text: "Удряме камбаните веднага!", impact: { morale: 30, military: -10 }, msg: "Градът е свободен! Пламъкът е запален." }, { text: "Организираме отбранителни линии.", impact: { military: 20, morale: -15 }, msg: "Подготвяте се за дълга обсада." }] },
+                        { title: "Райна Княгиня и Знамето", text: "Знамето е готово. Райна Попгеоргиева го предава на Георги Бенковски пред ликуващия народ.", img: "https://bulgarianhistory.org/wp-content/uploads/2014/04/%D0%90%D0%BF%D1%80%D0%B8%D0%BB%D1%81%D0%BA%D0%BE-%D0%B2%D1%8A%D1%81%D1%82%D0%B0%D0%BD%D0%B8%D0%B5.jpg", options: [{ text: "Шествие през целия град.", impact: { morale: 25 }, msg: "Целият народ вярва в победата!" }, { text: "Освещаване на знамето в църквата.", impact: { morale: 15, secret: 10 }, msg: "Духовно единство и решителност." }] },
+                        { title: "Черешовото топче", text: "Липсата на тежка артилерия ни принуждава да създадем легендарното дървено оръдие.", img: "https://static.bnr.bg/gallery/9d/9d2e495ae86692202d75533863dcc282.jpg", options: [{ text: "Използваме го за сигнал за атака.", impact: { morale: 20 }, msg: "Грохотът му вдъхва кураж на въстаниците." }, { text: "Поставяме го на ключова позиция.", impact: { military: 15 }, msg: "Сплашвате башибозука с изобретателност." }] },
+                        { title: "Защитата на Панагюрище", text: "Редовна османска войска настъпва. Градът е обграден от всички страни.", img: "https://121su.org/wp-content/uploads/2021/04/Aprilsko_Vystanie.jpg", options: [{ text: "Отбрана на подстъпите към града.", impact: { military: 20, morale: -10 }, msg: "Удържате първата вълна на атаката." }, { text: "Улични боеве до последен дъх.", impact: { morale: 30, military: -20 }, msg: "Всяка къща се превръща в крепост." }] },
+                        { title: "Смъртта на Бенковски", text: "След разгрома, Бенковски и малка група пресичат Балкана. Предателство ги чака на река Костина.", img: "https://plovdivnow.bg/news/2022/09/15/georgi-benkovski-targovetsat-koito-307.png", options: [{ text: "Опит за пробив през засадата.", impact: { military: -10, morale: 20 }, msg: "Войводата пада, но легендата се ражда." }, { text: "Прикриване на оцелелите в гората.", impact: { secret: 20 }, msg: "Опитвате се да съхраните жива искрата." }] },
+                        { title: "Героите на Перущица", text: "В църквата 'Св. Архангел Михаил' въстаниците правят своя най-тежък и свят избор.", img: "https://cdn4.focus.bg/fakti/photos/16x9/198/23-april-1876-g-aprilskoto-vastanie-perushtica-vastava-1.jpg", options: [{ text: "Саможертва в името на честта.", impact: { morale: 40 }, msg: "Кочо Честименски остава вечен пример." }, { text: "Последен опит за съпротива отвътре.", impact: { military: 10, morale: 10 }, msg: "Борба до последния куршум." }] },
+                        { title: "Ботев и 'Радецки'", text: "Четата на Христо Ботев заема австрийския параход и дебаркира при Козлодуй.", img: "https://bulgarianhistory.org/wp-content/uploads/2017/06/7899e2ded49cf057c3850975e4a30d0f_680x_01-500x333.jpg", options: [{ text: "Марш към Врачанския Балкан.", impact: { morale: 30, military: 10 }, msg: "Ботев повежда поетите и героите към безсмъртието." }, { text: "Организираме отбранителни линии.", impact: { secret: -10, morale: 20 }, msg: "Бунтът се разраства в нови земи." }] },
+                        { title: "Разпитът в конака", text: "Много от водачите са заловени и изправени пред турските съдилища.", img: "https://bookmartbg.com/wp-content/uploads/2023/02/Koprivstica-Aprilskoto-vastanie.jpg", options: [{ text: "Гордо мълчание и вярност.", impact: { secret: 25, morale: 20 }, msg: "Никой не издава комитетските тайни." }, { text: "Обвиняваме гнета за народния гняв.", impact: { morale: 15 }, msg: "Превръщате съда в трибуна на свободата." }] },
+                        { title: "След пожарищата", text: "Въстанието е удавено в кръв, но целта е постигната – светът вече знае за България.", img: "https://www.bulgarianhistory.org/wp-content/uploads/2017/03/ot-Knigata-Na-Gandev-500x339.jpg", options: [{ text: "Запазваме духа за следващата битка.", impact: { morale: 30 }, msg: "Свободата е въпрос на време!" }, { text: "Организираме помощ за вдовиците.", impact: { ethics: 20, morale: 10 }, msg: "Солидарността държи народа ни жив." }] }
+                    ]
+                },
+                CHRONICLER: {
+                    id: 'CHRONICLER', name: 'Хроникьоръ', icon: '📝', stats: { truth: 50, impact: 40, ethics: 60 },
+                    labels: { truth: '📝 Истина', impact: '🌍 Отзвук', ethics: '⚖️ Етика' },
+                    desc: 'Кореспондент на "Дейли Нюз". Вашето оръжие е истината.',
+                    story: [
+                        { title: "Слухове в Цариград", text: "В Галата и Пера се говори за пожари в Румелия. Посолствата мълчат.", img: "https://www.lostbulgaria.com/pic3/5553.jpg", options: [{ text: "Тръгвам за вътрешността на страната.", impact: { impact: 15 }, msg: "Пътувате през опасни територии за фактите." }, { text: "Интервюирам търговци от Пловдив.", impact: { truth: 10 }, msg: "Първите свидетелства потвърждават бунта." }] },
+                        { title: "Баташкото клане", text: "Влизате в Батак. Църквата е пълна с кости. Гледката е вледеняваща.", img: "https://frognews.bg/images/minalo/batak.jpg", options: [{ text: "Описвам суровата истина детайлно.", impact: { impact: 30, truth: 25 }, msg: "Вашият репортаж ще разтърси Лондон." }, { text: "Смекчавам тона за цензурата.", impact: { ethics: -20, impact: -10 }, msg: "Светът получава само бледо копие на ужаса." }] },
+                        { title: "Среща с оцелелите", text: "Оцелелите разказват за пепелища и загубени семейства. Очите им търсят правосъдие.", img: "https://bulgarianhistory.org/wp-content/uploads/2017/03/bata3.jpg", options: [{ text: "Записвам всяка лична история.", impact: { ethics: 20, truth: 15 }, msg: "Човешката болка става обвинение срещу империята." }, { text: "Търся документи за броя на жертвите.", impact: { truth: 20 }, msg: "Статистиката потвърждава мащаба на трагедията." }] },
+                        { title: "Натискът на цензурата", text: "Османските власти ви следят. Вашите телеграми биват забавяни.", img: "https://www.bulgarianhistory.org/wp-content/uploads/2017/03/macgahan3jpg_29550.jpg", options: [{ text: "Намирам таен начин за пращане на вести.", impact: { truth: 25, impact: 10 }, msg: "Истината не може да бъде спряна!" }, { text: "Променям заглавията, за да минат.", impact: { ethics: -10, impact: -5 }, msg: "Губите част от тежестта на думите си." }] },
+                        { title: "Виктор Юго и Гарибалди", text: "Европейските интелектуалци реагират на Вашите дописки.", img: "https://www.lifebites.bg/wp-content/uploads/2018/02/collage-victor-hugo.jpg", options: [{ text: "Изпращам материали директно на Юго.", impact: { impact: 35 }, msg: "Гласът на Юго кънти: 'Европа трябва да спре това!'" }, { text: "Публикувам във френската преса.", impact: { impact: 20 }, msg: "Франция се активизира в подкрепа на българите." }] },
+                        { title: "Битката на фактите", text: "В Лондон твърдят, че кланетата са „българска измислица“.", img: "https://upload.wikimedia.org/wikipedia/commons/6/6d/Massaker_In_Batak_Bulgarien_1876_1.jpg", options: [{ text: "Представям материални доказателства.", impact: { truth: 30, impact: 20 }, msg: "Скептиците в Парламента са разбити." }, { text: "Организирам свидетели дипломати.", impact: { truth: 15, ethics: 15 }, msg: "Вашият авторитет нараства международно." }] },
+                        { title: "Лейди Странгфорд", text: "Основава се фонд за подпомагане на българите. Милосърдието настъпва след меча.", img: "https://static.bnr.bg/gallery/cr/medium/380de157d40afc8547706f1e24308e60.jpg", options: [{ text: "Пиша за нуждата от хуманитарна помощ.", impact: { ethics: 30, impact: 15 }, msg: "Събрани са хиляди лири за оцелелите." }, { text: "Придружавам мисиите до селата.", impact: { ethics: 20, truth: 10 }, msg: "Виждате как надеждата се връща." }] },
+                        { title: "Достоверността на Макгахан", text: "Вашите думи стават основа за официални доклади.", img: "https://lira.bg/wp-content/uploads/2013/03/xUntitled-5.jpg.pagespeed.ic.vz74C8Kehu.webp", options: [{ text: "Публикувам книга с пълните разследвания.", impact: { truth: 40, impact: 30 }, msg: "Вие променихте мнението на Великите сили." }, { text: "Давам показания перед комисиите.", impact: { truth: 25, ethics: 15 }, msg: "Истината е закована в официалната история." }] },
+                        { title: "Последната телеграма", text: "Всичко е изпратено. Светът вече няма извинение да мълчи.", img: "https://www.1900s.org.uk/1930s-images/telegrams1939-03.jpg", options: [{ text: "Напускам фронта с вдигната глава.", impact: { ethics: 20, impact: 10 }, msg: "Мисията ви като журналист е изпълнена." }, { text: "Оставам за следващия конфликт.", impact: { truth: 10 }, msg: "Вие сте станали свидетел на историята." }] },
+                        { title: "Светът знае", text: "България е свободна в сърцата на хората по света.", img: "https://www.bulgarianhistory.org/wp-content/uploads/2017/03/ot-Knigata-Na-Gandev-500x339.jpg", options: [{ text: "Признание за силата на истината.", impact: { truth: 50 }, msg: "Без Вашето перо, Свободата би закъсняла." }, { text: "Почит към паметта на загиналите.", impact: { ethics: 40 }, msg: "Вашите репортажи са техният вечен паметник." }] }
+                    ]
+                },
+                DIPLOMAT: {
+                    id: 'DIPLOMAT', name: 'Дипломатъ', icon: '🎩', stats: { prestige: 50, peace: 40, strategy: 60 },
+                    labels: { prestige: '🏅 Престиж', peace: '🕊️ Мир', strategy: '🧠 Стратегия' },
+                    desc: 'Разследващ дипломат в Цариград. Вашата цел е справедливост и автономия.',
+                    story: [
+                        { title: "Смущаващи доклади от Цариград", text: "До посолствата в Галата стигат сведения за изстъпления в Румелия. Посланикът иска Вашето мнение.", img: "https://www.lostbulgaria.com/pic3/5553.jpg", options: [{ text: "Настоявам за сформиране на анкетна комисия.", impact: { prestige: 15, strategy: 10 }, msg: "Дипломатическият натиск започва. Портата е нервна." }, { text: "Предлагам да изчакаме официалната версия.", impact: { peace: 15, prestige: -10 }, msg: "Печелите време за султана, но губите доверието на българите." }] },
+                        { title: "Мисията в Батак", text: "Пристигате на мястото на събитията заедно с Евгений Скайлър. Ужасът в църквата е неоспорим.", img: "https://frognews.bg/images/minalo/batak.jpg", options: [{ text: "Подписвам съвместен протокол за жестокостите.", impact: { prestige: 20, strategy: 15 }, msg: "Документът е неоспорим. Султанът не може да го отрече." }, { text: "Преговарям за амнистия на оцелелите.", impact: { peace: 20, prestige: 10 }, msg: "Спасявате животи, но политическият проблем остава." }] },
+                        { title: "Среща с Екзарх Йосиф", text: "Българският духовен водач търси подкрепа за своя народ сред международните пратеници.", img: "https://bulgarianhistory.org/wp-content/uploads/2015/09/%D0%9F%D0%BE%D0%BF.jpg", options: [{ text: "Обещавам международна закрила на християните.", impact: { prestige: 20 }, msg: "Екзархията става съюзник на Вашата мисия." }, { text: "Препоръчвам търпение и смирение.", impact: { peace: 10, prestige: -15 }, msg: "Духовенството се чувства изоставено от Европа." }] },
+                        { title: "Интервю за европейския печат", text: "Вестниците по света искат Вашето изявление като пряк свидетел на анкетната комисия.", img: "https://washingtonian.com/wp-content/uploads/2016/08/08262016-newspapers.jpg", options: [{ text: "Потвърждавам, че това е „клане“, а не бунт.", impact: { prestige: 25, strategy: 20 }, msg: "Думите Ви разпалват политическа буря в Лондон и Париж." }, { text: "Използвам обтекаеми изрази за събитията.", impact: { peace: 15, prestige: -20 }, msg: "Успокоявате духовете, но истината страда." }] },
+                        { title: "Протестът на Великия везир", text: "Високата порта Ви обвинява в намеса във вътрешните работи на империята.", img: "https://istorianasveta.eu/images/osmanska_imperia/divan/Thomas_allom_c1840_The_Enterance_to_Divan.jpg", options: [{ text: "Връчвам остра нота от името на силите.", impact: { prestige: 20, strategy: 15 }, msg: "Дипломатическите отношения са обтегнати до краен предел." }, { text: "Опитвам се да загладя противоречията.", impact: { peace: 20, prestige: -10 }, msg: "Мирът е запазен временно, но на висока цена." }] },
+                        { title: "Планът за автономни области", text: "Предстои чертаене на картата на бъдеща България на Цариградската конференция.", img: "https://cdn5.amcn.in/a/granitsi.alle.bg/assets/6e6e2e6bbf68-c999999999/p9fdu5eg1fa1sacuk8k.jpg", options: [{ text: "Подкрепям широка автономия в етническите граници.", impact: { prestige: 25, strategy: 20 }, msg: "Вие поставяте основите на единна българска държава." }, { text: "Предлагам разделяне на две провинции.", impact: { peace: 15, strategy: -10 }, msg: "Компромис, който ще бъде оспорен от историята." }] },
+                        { title: "Санкции срещу извършителите", text: "Светът иска наказание за отговорните за жестокостите в Батак и Перущица.", img: "https://defakto.bg/wp-content/uploads/2017/12/%D0%A1%D1%8A%D0%B4%D0%B8%D0%B9%D1%81%D0%BA%D0%BE-%D1%87%D1%83%D0%BA%D1%87%D0%B5-%D0%BF%D0%BB%D1%8E%D1%81-%D1%87%D0%B5%D1%82%D0%B8%D0%B2%D0%B0-1024x576.jpg", options: [{ text: "Настоявам за международен трибунал.", impact: { prestige: 20, strategy: 15 }, msg: "Справедливостта е видима за целия свят." }, { text: "Предлагам само парично обезщетение.", impact: { peace: 10, strategy: -15 }, msg: "Опит за „купуване“ на мира, който е неуспешен." }] },
+                        { title: "Натискът на лорд Биконсфилд", text: "Бенджамин Дизраели е скептичен към българската кауза. Трябва да го убедите.", img: "https://upload.wikimedia.org/wikipedia/commons/6/6e/Benjamin_Disraeli%2C_Earl_of_Beaconsfield.jpg", options: [{ text: "Изпращам таен доклад с неоспорими факти.", impact: { strategy: 30, prestige: 15 }, msg: "Променяте мнението на кабинета в Лондон." }, { text: "Присъединявам се към мнението на премиера.", impact: { peace: 10, prestige: -25 }, msg: "Вашата кариера е спасена, но съвестта – не." }] },
+                        { title: "Цариградският протокол", text: "Всички велики сили са събрани. Време е за окончателен подпис под реформите.", img: "https://maps.bg/userfiles/editor/image/Tsarigradska-konferencia-maps-bg.jpg", options: [{ text: "Настоявам за железни гаранции за реформи.", impact: { prestige: 25, strategy: 20 }, msg: "Русия вече има повод за военна намеса." }, { text: "Подписвам само символичен документ.", impact: { peace: 15, strategy: -20 }, msg: "Документът остава само на хартия." }] },
+                        { title: "Пътят на войната", text: "Дипломацията е изчерпана. Оръжията ще решат съдбата на Балканите.", img: "https://armymedia.bg/wp-content/uploads/2024/03/orajie-vojna.jpg", options: [{ text: "Подготвям почвата за мирната конференция.", impact: { strategy: 40, prestige: 20 }, msg: "Вашият труд ще се види в Сан Стефано." }, { text: "Напускам мисията with разочарование.", impact: { peace: -20, prestige: 10 }, msg: "Оръжията ще довършат това, което перото започна." }] }
+                    ]
+                }
+            }
+        };
+
+        let state = { name: '', role: null, step: 0, stats: {} };
+        const view = document.getElementById('game-view');
+        const header = document.getElementById('game-header');
+
+        const actions = {
+            toRoleSelection() {
+                const name = document.getElementById('input-name').value.trim();
+                if (!name) return;
+                state.name = name;
+                view.innerHTML = `<div class="p-8 fade-in max-w-5xl mx-auto h-full flex flex-col justify-center"><div class="text-center mb-12"><h2 class="text-3xl font-bold serif text-slate-900 uppercase tracking-widest">Изберете съдба</h2><p class="text-slate-600 italic">Вашето място в историята е тук.</p></div><div class="grid grid-cols-1 md:grid-cols-3 gap-8">${Object.values(DATABASE.roles).map(role => `<div onclick="actions.selectRole('${role.id}')" class="role-card bg-white p-8 rounded-[2rem] cursor-pointer shadow-xl text-center border-b-4 border-slate-200 hover:border-amber-500"><div class="text-6xl mb-6">${role.icon}</div><h3 class="text-2xl font-bold mb-3 serif text-slate-900">${role.name}</h3><p class="text-sm text-slate-500 mb-8 leading-relaxed px-4">${role.desc}</p><button class="bg-slate-900 text-white px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest">Избери</button></div>`).join('')}</div></div>`;
+            },
+            selectRole(roleId) {
+                state.role = DATABASE.roles[roleId];
+                state.stats = { ...state.role.stats };
+                state.step = 0;
+                document.getElementById('player-role-name').innerText = state.role.name;
+                document.getElementById('player-display-name').innerText = state.name;
+                header.classList.remove('hidden');
+                this.updateStats();
+                this.renderStep();
+            },
+            updateStats() {
+                const panel = document.getElementById('stats-panel');
+                panel.innerHTML = Object.entries(state.stats).map(([k, v]) => `<div class="w-20 md:w-28"><div class="flex justify-between text-[8px] font-bold text-slate-400 uppercase"><span>${state.role.labels[k]}</span><span>${v}%</span></div><div class="stat-progress"><div class="stat-fill" style="width: ${v}%"></div></div></div>`).join('');
+            },
+            renderStep() {
+                const current = state.role.story[state.step];
+                if (!current) return this.renderEnd();
+                view.innerHTML = `<div class="p-6 md:p-10 fade-in max-w-4xl mx-auto flex flex-col h-full"><div class="mb-6"><span class="text-[10px] font-black text-amber-600 uppercase tracking-widest">Казус ${state.step + 1} от 10</span><h2 class="text-xl md:text-3xl font-bold serif text-slate-900 mt-1 uppercase">${current.title}</h2></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8"><img src="${current.img}" class="case-image shadow-2xl" onerror="this.src='https://images.unsplash.com/photo-1585829365234-70b094447482?q=80&w=1000&auto=format&fit=crop'"><div class="flex flex-col justify-center"><div class="text-lg leading-relaxed text-slate-800 italic bg-white/60 p-8 rounded-3xl border-l-4 border-amber-600 shadow-sm">"${current.text}"</div></div></div><div class="grid grid-cols-1 gap-4 mt-auto">${current.options.map((opt, i) => `<button onclick="actions.makeChoice(${i})" class="choice-btn w-full text-left p-5 bg-white rounded-2xl shadow-md border border-slate-100 group"><div class="flex items-center gap-5"><div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-400 group-hover:bg-amber-600 group-hover:text-white transition-all shadow-inner">${i + 1}</div><p class="text-slate-900 font-bold serif text-lg">${opt.text}</p></div></button>`).join('')}</div></div>`;
+                view.scrollTo(0, 0);
+            },
+            makeChoice(idx) {
+                const choice = state.role.story[state.step].options[idx];
+                Object.entries(choice.impact).forEach(([s, v]) => {
+                    if (state.stats.hasOwnProperty(s)) {
+                        state.stats[s] = Math.max(0, Math.min(100, state.stats[s] + v));
+                    }
+                });
+                this.updateStats();
+                view.innerHTML = `<div class="h-full flex items-center justify-center p-6 fade-in"><div class="max-w-xl w-full bg-white p-12 rounded-[3rem] shadow-2xl border-t-8 border-amber-600 text-center"><div class="text-6xl mb-8">🖋️</div><h3 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Последици</h3><p class="text-2xl serif italic text-slate-900 mb-10 font-bold leading-snug">"${choice.msg}"</p><button onclick="actions.next()" class="w-full bg-slate-950 text-white py-5 rounded-2xl font-bold uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all">Продължи ➔</button></div></div>`;
+            },
+            next() { state.step++; this.renderStep(); },
+            renderEnd() {
+                header.classList.add('hidden');
+                const finalStats = Object.entries(state.stats);
+                
+                view.innerHTML = `<div class="h-full flex items-center justify-center map-bg p-6 text-white text-center"><div class="max-w-3xl w-full bg-slate-950/90 p-12 rounded-[3rem] border border-amber-600/30 backdrop-blur-xl shadow-2xl fade-in"><h2 class="text-4xl md:text-6xl font-bold serif mb-4 text-amber-500 uppercase tracking-tighter">ВАШИЯТ ДЪЛГ Е ИЗПЪЛНЕН</h2><p class="text-xl mb-12 italic text-slate-300">„${state.name}, Вашите избори промениха хода на историята.“</p><div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">${finalStats.map(([k, v]) => `<div class="bg-slate-900/60 p-6 rounded-[2rem] border border-slate-800 shadow-inner group hover:border-amber-500 transition-all"><div class="text-[10px] text-slate-500 font-black uppercase mb-3 tracking-widest">${state.role.labels[k]}</div><div class="text-5xl font-bold text-amber-500 serif group-hover:scale-110 transition-transform">${v}%</div></div>`).join('')}</div><div class="flex flex-col sm:flex-row gap-6 justify-center"><button onclick="actions.generateCertificate()" class="bg-amber-600 hover:bg-amber-500 px-10 py-5 rounded-2xl font-bold uppercase text-sm tracking-widest shadow-lg shadow-amber-900/20 transition-all">📜 Свали Грамота</button><button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 px-10 py-5 rounded-2xl font-bold uppercase text-sm tracking-widest transition-all">Ново начало</button></div></div></div>`;
+            },
+            generateCertificate() {
+                const canvas = document.getElementById('cert-canvas');
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fcf5e5'; ctx.fillRect(0, 0, 800, 600);
+                ctx.strokeStyle = '#b45309'; ctx.lineWidth = 15; ctx.strokeRect(20, 20, 760, 560);
+                ctx.textAlign = 'center'; ctx.fillStyle = '#1a1a1a'; ctx.font = 'bold 36px serif'; ctx.fillText('ИСТОРИЧЕСКА ГРАМОТА', 400, 100);
+                ctx.font = 'italic 20px serif'; ctx.fillText('С настоящото се признава делото на', 400, 180);
+                ctx.font = 'bold 42px serif'; ctx.fillStyle = '#b45309'; ctx.fillText(state.name.toUpperCase(), 400, 250);
+                ctx.fillStyle = '#1a1a1a'; ctx.font = '22px serif'; ctx.fillText(`като ${state.role.name} в събитията от 1876 г.`, 400, 310);
+                ctx.font = 'bold 28px serif'; ctx.fillText('„Свобода или Смъртъ!“', 400, 450);
+                const link = document.createElement('a'); link.download = `1876-${state.name}.png`; link.href = canvas.toDataURL(); link.click();
+            }
+        };
+    </script>
+</body>
+</html>
